@@ -5,25 +5,33 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Household Carbon Tracker</title>
 
+  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <style>
     :root{
-      --bg: #f6f8fb;
+      --bg: #476eaa;
       --card: #ffffff;
       --muted: #6b7280;
       --accent: #0f766e;
       --accent-2: #06b6d4;
+      --glass: rgba(255,255,255,0.8);
       --radius: 14px;
-      font-family: Inter, ui-sans-serif, system-ui;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     }
 
+    *{box-sizing: border-box}
     body{
       margin:0;
       background: linear-gradient(180deg,var(--bg),#eef2f7);
+      min-height:100vh;
+      color:#000000;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
       padding:24px;
       display:flex;
       justify-content:center;
+      align-items:flex-start;
     }
 
     .container{
@@ -32,6 +40,7 @@
       display:grid;
       grid-template-columns: 1fr 420px;
       gap:20px;
+      align-items:start;
     }
 
     .card{
@@ -41,158 +50,460 @@
       padding:18px;
     }
 
-    h1{margin:0}
+    header.card{
+      grid-column:1/-1;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:18px 20px;
+    }
+
+    header h1{
+      margin:0;
+      font-size:20px;
+      letter-spacing:0.1px;
+    }
+    header p{margin:0;color:var(--muted);font-size:13px}
+
+    form .row{
+      display:flex;
+      gap:12px;
+      margin-bottom:12px;
+      align-items:center;
+    }
+
+    label{
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+
+    input[type="number"], select {
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid #e6e9ee;
+      outline:none;
+      font-size:14px;
+      background:transparent;
+    }
+
+    .field{
+      flex:1;
+    }
+
+    .half{flex:1}
+    .third{flex:0.66}
+
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top:14px;
+    }
 
     button{
+      appearance:none;
+      border:0;
       padding:10px 14px;
       border-radius:10px;
       cursor:pointer;
       font-weight:600;
-      border:none;
+      font-size:14px;
     }
 
     .btn-primary{
       background:linear-gradient(90deg,var(--accent),var(--accent-2));
       color:white;
+      box-shadow: 0 6px 18px rgba(6,182,212,0.12);
+      flex:1;
     }
 
     .btn-outline{
-      background:white;
-      border:1px solid #e5e7eb;
+      background:transparent;
+      border:1px solid #e6eef0;
+      color:var(--accent);
+      flex:0;
     }
 
-    .actions{
-      display:flex;
-      gap:10px;
-      margin-top:15px;
-      flex-wrap:wrap;
+    .kpis{
+      display:grid;
+      grid-template-columns: repeat(2,1fr);
+      gap:12px;
+      margin-top:12px;
     }
+
+    .kpi{
+      background: linear-gradient(180deg, rgba(6,182,212,0.04), transparent);
+      padding:12px;
+      border-radius:10px;
+      font-size:13px;
+    }
+
+    .kpi strong{display:block;font-size:18px;margin-top:6px}
+
+    /* right column specifics */
+    .right {
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      position:sticky;
+      top:24px;
+      height:fit-content;
+    }
+
+    .mini{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .muted { color:var(--muted); font-size:13px }
 
     canvas{ width:100% !important; height:260px !important; }
+
+    footer.note{ grid-column:1/-1; margin-top:10px; font-size:12px; color:var(--muted); text-align:center }
+
+    /* small screens */
+    @media (max-width:900px){
+      .container{ grid-template-columns: 1fr; padding-bottom:40px;}
+      header.card{ flex-direction:column; align-items:flex-start; gap:8px}
+      .right{ position:relative; top:auto }
+    }
   </style>
 </head>
 
 <body>
-<div class="container">
+  <div class="container">
 
-<section class="card">
-<h1>Household Carbon Tracker</h1>
+    <header class="card">
+      <div>
+        <h1>Household Carbon Tracker</h1>
+        <p>Enter values from your utility bills & receipts to estimate household CO₂ (kg)</p>
+      </div>
+      <div style="text-align:right">
+        <div class="muted">Emission factors:</div>
+        <div style="font-size:13px;color:var(--muted)">Electricity: <strong>0.82 kgCO₂/kWh</strong> · LPG: <strong>42.5 kg/cyl</strong> · Transport: <strong>0.2 kg/km</strong></div>
+      </div>
+    </header>
 
-<form onsubmit="event.preventDefault(); localCalculate();">
+    <!-- LEFT: form + results -->
+    <section class="card">
+      <form id="trackerForm" onsubmit="event.preventDefault(); localCalculate();">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="field">
+            <label>Household name (optional)</label>
+            <input id="householdName" type="text" placeholder="eg. Patkar family">
+          </div>
 
-<label>Household Name</label>
-<input id="householdName" type="text">
+          <div style="width:120px">
+            <label>Household size</label>
+            <input id="householdSize" type="number" min="1" step="1" value="1">
+          </div>
+        </div>
 
-<label>Household Size</label>
-<input id="householdSize" type="number" value="1" min="1">
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef2f7">
 
-<label>Electricity (kWh)</label>
-<input id="electricity_kwh" type="number">
+        <!-- Electricity section: allow either kWh or bill+tariff -->
+        <div>
+          <label><strong>Electricity</strong> — choose input type</label>
+          <div class="row">
+            <select id="electricityMode" onchange="toggleElectricityMode()">
+              <option value="kwh">Units (kWh / month)</option>
+              <option value="bill">Bill amount + tariff</option>
+            </select>
+          </div>
 
-<label>LPG Cylinders</label>
-<input id="lpg_cylinders" type="number">
+          <div id="electricityKwhField" class="row">
+            <div class="field">
+              <label>Units (kWh per month)</label>
+              <input id="electricity_kwh" type="number" min="0" step="0.1" placeholder="eg. 210">
+            </div>
+          </div>
 
-<label>Distance (km)</label>
-<input id="distance_km" type="number">
+          <div id="electricityBillField" style="display:none">
+            <div class="row">
+              <div class="field">
+                <label>Bill amount (₹) per month</label>
+                <input id="electricity_bill" type="number" min="0" step="0.1" placeholder="eg. 2800">
+              </div>
+              <div style="width:160px">
+                <label>Tariff (₹ per kWh)</label>
+                <input id="electricity_tariff" type="number" min="0.01" step="0.01" placeholder="eg. 6.5">
+              </div>
+            </div>
+          </div>
+        </div>
 
-<label>Waste (kg)</label>
-<input id="waste_kg" type="number">
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef2f7">
 
-<label>Recycling (%)</label>
-<input id="recycle_pct" type="number" value="0" min="0" max="100">
+        <div>
+          <label><strong>Cooking fuel (LPG)</strong></label>
+          <div class="row">
+            <div class="field">
+              <label>Number of LPG cylinders used per month</label>
+              <input id="lpg_cylinders" type="number" min="0" step="0.1" placeholder="eg. 0.5">
+            </div>
+            <div style="width:120px">
+              <label>Or LPG (kg/month) — optional</label>
+              <input id="lpg_kg" type="number" min="0" step="0.1" placeholder="">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:6px">If both entered, cylinders take precedence.</div>
+        </div>
 
-<div class="actions">
-  <button class="btn-primary" type="submit">Calculate (Local)</button>
-  <button class="btn-outline" type="button" onclick="sendToAPI()">Send to API</button>
-  <a href="/records">
-    <button type="button" class="btn-outline">View Records</button>
-  </a>
-</div>
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef2f7">
 
-</form>
+        <div>
+          <label><strong>Transport</strong></label>
+          <div class="row">
+            <div class="field">
+              <label>Monthly distance by car / bike / scooter (km)</label>
+              <input id="distance_km" type="number" min="0" step="0.1" placeholder="eg. 400">
+            </div>
+            <div style="width:160px">
+              <label>Average passengers (for car) — optional</label>
+              <input id="car_passengers" type="number" min="1" step="1" value="1">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:6px">Default transport factor: 0.2 kgCO₂ / km (use across vehicles for project simplicity)</div>
+        </div>
 
-<div id="results" style="margin-top:20px;"></div>
-</section>
+        <hr style="margin:12px 0;border:none;border-top:1px solid #eef2f7">
 
-<aside class="card">
-<canvas id="breakdownChart"></canvas>
-</aside>
+        <div>
+          <label><strong>Waste</strong></label>
+          <div class="row">
+            <div class="field">
+              <label>Approx. household waste (kg per month)</label>
+              <input id="waste_kg" type="number" min="0" step="0.1" placeholder="eg. 30">
+            </div>
+            <div style="width:120px">
+              <label>Recycling rate (%)</label>
+              <input id="recycle_pct" type="number" min="0" max="100" step="1" value="10">
+            </div>
+          </div>
+          <div class="muted" style="font-size:12px;margin-top:6px">Waste CO₂ factor: 1.8 kgCO₂/kg (we subtract recycled % from emissions)</div>
+        </div>
 
-</div>
+        <div class="actions">
+          <button class="btn-primary" type="submit">Calculate (Local)</button>
+          <button class="btn-outline" type="button" onclick="resetForm()">Reset</button>
+          <button class="btn-outline" type="button" onclick="sendToAPI()">Send to API</button>
+          <a href="/records">
+            <button class="btn-outline" type="button">View Records</button>
+          </a>
+        </div>
+      </form>
 
-<script>
+      <!-- results -->
+      <div id="results" class="kpis" style="margin-top:16px; grid-template-columns:repeat(2,1fr)"></div>
 
-const ELECTRICITY_FACTOR = 0.82;
-const LPG_FACTOR = 42.5;
-const TRANSPORT_FACTOR = 0.2;
-const WASTE_FACTOR = 1.8;
+      <div id="detailed" style="margin-top:12px"></div>
+    </section>
 
-const ctx = document.getElementById('breakdownChart').getContext('2d');
-let chart = new Chart(ctx, {
-  type: 'pie',
-  data: {
-    labels: ['Electricity','LPG','Transport','Waste'],
-    datasets: [{ data:[0,0,0,0] }]
-  }
-});
+    <!-- RIGHT: chart + quick summary -->
+    <aside class="right">
+      <div class="card">
+        <div class="mini">
+          <div>
+            <div class="muted">Quick summary</div>
+            <div style="font-size:18px;font-weight:700" id="summary_total">— kgCO₂ / month</div>
+            <div class="muted" style="font-size:13px" id="summary_person">— kgCO₂ per person / month</div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted" style="font-size:13px">Last updated</div>
+            <div id="summary_time" style="font-size:12px;color:var(--muted)">—</div>
+          </div>
+        </div>
 
-function localCalculate(){
+        <div style="margin-top:12px">
+          <canvas id="breakdownChart"></canvas>
+        </div>
+      </div>
 
-  const size = parseInt(document.getElementById("householdSize").value || 1);
-  const electricity = parseFloat(document.getElementById("electricity_kwh").value || 0);
-  const lpg = parseFloat(document.getElementById("lpg_cylinders").value || 0);
-  const distance = parseFloat(document.getElementById("distance_km").value || 0);
-  const waste = parseFloat(document.getElementById("waste_kg").value || 0);
-  const recycle = parseFloat(document.getElementById("recycle_pct").value || 0);
+      <div class="card">
+        <div class="muted">Tips</div>
+        <ul style="margin:8px 0 0 16px;padding:0;color:var(--muted);font-size:13px">
+          <li>Switch to LED bulbs & more efficient appliances.</li>
+          <li>Use public transport / carpool for daily commute.</li>
+          <li>Reduce waste & increase recycling.</li>
+          <li>Check electricity tariff & reduce peak usage.</li>
+        </ul>
+      </div>
+    </aside>
 
-  const electricity_co2 = electricity * ELECTRICITY_FACTOR;
-  const lpg_co2 = lpg * LPG_FACTOR;
-  const transport_co2 = distance * TRANSPORT_FACTOR;
-  const waste_co2 = (waste * WASTE_FACTOR) * (1 - recycle/100);
+    <footer class="note card">
+     Thank for trying out this simple household carbon tracker demo! It’s designed for quick estimates based on user inputs and project-default emission factors. For more accurate tracking, consider using actual utility data, more detailed transport info, and waste audits. This is a starting point to raise awareness and encourage action on household emissions.  
+    </footer>
+  </div>
 
-  const total = electricity_co2 + lpg_co2 + transport_co2 + waste_co2;
+  <script>
+    // --- emission factors (project defaults) ---
+    const ELECTRICITY_FACTOR = 0.82; // kg CO2 per kWh
+    const LPG_FACTOR = 42.5;         // kg CO2 per cylinder
+    const LPG_KG_FACTOR = 1.0;       // optional mapping if user provides LPG kg (we assume 1 cyl ~ 14.2kg, but keep simple)
+    const TRANSPORT_FACTOR = 0.2;    // kg CO2 per km
+    const WASTE_FACTOR = 1.8;        // kg CO2 per kg waste monthly
 
-  document.getElementById("results").innerHTML =
-    `<strong>Total Monthly CO₂:</strong> ${total.toFixed(2)} kg`;
+    // DOM shortcuts
+    const resultsEl = document.getElementById('results');
+    const detailedEl = document.getElementById('detailed');
+    const summaryTotal = document.getElementById('summary_total');
+    const summaryPerson = document.getElementById('summary_person');
+    const summaryTime = document.getElementById('summary_time');
 
-  chart.data.datasets[0].data = [
-    electricity_co2,
-    lpg_co2,
-    transport_co2,
-    waste_co2
-  ];
-  chart.update();
-}
-
-/* ✅ PROPER SEND TO API FUNCTION */
-async function sendToAPI(){
-
-  const payload = {
-    household_name: document.getElementById('householdName').value || "",
-    household_size: parseInt(document.getElementById('householdSize').value || 1),
-    electricity_kwh: parseFloat(document.getElementById('electricity_kwh').value || 0),
-    lpg_cylinders: parseFloat(document.getElementById('lpg_cylinders').value || 0),
-    distance_km: parseFloat(document.getElementById('distance_km').value || 0),
-    waste_kg: parseFloat(document.getElementById('waste_kg').value || 0),
-    recycle_pct: parseFloat(document.getElementById('recycle_pct').value || 0)
-  };
-
-  try {
-    const response = await fetch("/calculate", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify(payload)
+    // chart setup
+    const ctx = document.getElementById('breakdownChart').getContext('2d');
+    let breakdownChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['Electricity','LPG','Transport','Waste'],
+        datasets: [{
+          data: [0,0,0,0],
+          // colors will be default; Chart.js handles it
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
     });
 
-    await response.json();
-    alert("✅ Data saved successfully!");
+    function toggleElectricityMode(){
+      const mode = document.getElementById('electricityMode').value;
+      document.getElementById('electricityKwhField').style.display = mode === 'kwh' ? 'block' : 'none';
+      document.getElementById('electricityBillField').style.display = mode === 'bill' ? 'block' : 'none';
+    }
 
-  } catch(err){
-    alert("❌ Error sending data");
-  }
-}
+    function resetForm(){
+      document.getElementById('trackerForm').reset();
+      toggleElectricityMode();
+      resultsEl.innerHTML = '';
+      detailedEl.innerHTML = '';
+      updateSummary(0,0,[]);
+    }
 
-</script>
+    function formatNum(n){
+      if (n === 0) return '0';
+      return Number(n).toLocaleString(undefined, {maximumFractionDigits:2});
+    }
 
+    function localCalculate(){
+      // read values
+      const size = Math.max(1, parseFloat(document.getElementById('householdSize').value || 1));
+      const mode = document.getElementById('electricityMode').value;
+
+      let electricity_kwh = parseFloat(document.getElementById('electricity_kwh').value || 0);
+      if (mode === 'bill'){
+        const bill = parseFloat(document.getElementById('electricity_bill').value || 0);
+        const tariff = parseFloat(document.getElementById('electricity_tariff').value || 0);
+        if (tariff > 0) electricity_kwh = bill / tariff;
+      }
+
+      const lpg_cyl = parseFloat(document.getElementById('lpg_cylinders').value || 0);
+      const lpg_kg = parseFloat(document.getElementById('lpg_kg').value || 0);
+
+      const distance_km = parseFloat(document.getElementById('distance_km').value || 0);
+      const passengers = Math.max(1, parseInt(document.getElementById('car_passengers').value || 1));
+
+      const waste_kg = parseFloat(document.getElementById('waste_kg').value || 0);
+      const recycle_pct = Math.max(0, Math.min(100, parseFloat(document.getElementById('recycle_pct').value || 0)));
+
+      // calculations
+      const electricity_co2 = electricity_kwh * ELECTRICITY_FACTOR;
+      const lpg_co2 = (lpg_cyl > 0) ? (lpg_cyl * LPG_FACTOR) : (lpg_kg * (LPG_FACTOR/14.2 || 3)); // fallback
+      const transport_co2 = distance_km * TRANSPORT_FACTOR / passengers; // per household (we divide by passengers only if sharing)
+      const waste_co2_raw = waste_kg * WASTE_FACTOR;
+      const waste_co2 = waste_co2_raw * (1 - recycle_pct/100);
+
+      const total_monthly = electricity_co2 + lpg_co2 + transport_co2 + waste_co2;
+      const total_yearly = total_monthly * 12;
+      const per_person_month = total_monthly / size;
+      const per_person_year = total_yearly / size;
+
+      // update UI
+      resultsEl.innerHTML = `
+        <div class="kpi"><div class="muted">Electricity (monthly)</div><strong>${formatNum(electricity_co2)} kg</strong></div>
+        <div class="kpi"><div class="muted">LPG (monthly)</div><strong>${formatNum(lpg_co2)} kg</strong></div>
+        <div class="kpi"><div class="muted">Transport (monthly)</div><strong>${formatNum(transport_co2)} kg</strong></div>
+        <div class="kpi"><div class="muted">Waste (monthly)</div><strong>${formatNum(waste_co2)} kg</strong></div>
+      `;
+
+      detailedEl.innerHTML = `
+        <div style="margin-top:12px;padding:12px;border-radius:10px;background:#fbfcfe;border:1px solid #eef6f7">
+          <div style="font-weight:700">Totals</div>
+          <div style="margin-top:8px;color:var(--muted)">
+            Total monthly: <strong>${formatNum(total_monthly)} kg CO₂</strong><br>
+            Total yearly: <strong>${formatNum(total_yearly)} kg CO₂</strong><br>
+            Per person / month: <strong>${formatNum(per_person_month)} kg CO₂</strong>
+          </div>
+        </div>
+      `;
+
+      // update chart
+      const breakdown = [electricity_co2, lpg_co2, transport_co2, waste_co2];
+      breakdownChart.data.datasets[0].data = breakdown;
+      breakdownChart.update();
+
+      updateSummary(total_monthly, per_person_month, breakdown);
+    }
+
+    function updateSummary(total_monthly, per_person_month, breakdown){
+      summaryTotal.textContent = total_monthly ? `${formatNum(total_monthly)} kg CO₂ / month` : '— kgCO₂ / month';
+      summaryPerson.textContent = per_person_month ? `${formatNum(per_person_month)} kg CO₂ per person / month` : '— kgCO₂ per person / month';
+      summaryTime.textContent = (total_monthly ? new Date().toLocaleString() : '—');
+    }
+
+    async function sendToAPI(){
+      // build same payload as Flask expects
+      const mode = document.getElementById('electricityMode').value;
+      let electricity_kwh = parseFloat(document.getElementById('electricity_kwh').value || 0);
+      if (mode === 'bill'){
+        const bill = parseFloat(document.getElementById('electricity_bill').value || 0);
+        const tariff = parseFloat(document.getElementById('electricity_tariff').value || 0);
+        if (tariff > 0) electricity_kwh = bill / tariff;
+      }
+
+      const payload = {
+        household_name: document.getElementById('householdName').value || '',
+        household_size: parseInt(document.getElementById('householdSize').value || 1),
+        electricity_kwh: Number(electricity_kwh),
+        lpg_cylinders: Number(parseFloat(document.getElementById('lpg_cylinders').value || 0)),
+        lpg_kg: Number(parseFloat(document.getElementById('lpg_kg').value || 0)),
+        distance_km: Number(parseFloat(document.getElementById('distance_km').value || 0)),
+        waste_kg: Number(parseFloat(document.getElementById('waste_kg').value || 0)),
+        recycle_pct: Number(parseFloat(document.getElementById('recycle_pct').value || 0)),
+        timestamp: new Date().toISOString()
+      };
+
+      // quick local calc and show results too
+      localCalculate();
+
+      // send to backend - change URL if needed
+      const endpoint = '/calculate';
+      try {
+        const resp = await fetch(endpoint, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error(`Server responded ${resp.status}`);
+        const data = await resp.json();
+        alert('Data sent to API — response received. Check console for details.');
+        console.log('API response:', data);
+      } catch (err) {
+        alert('Could not send to API. Make sure Flask backend is running at ' + endpoint);
+        console.error(err);
+      }
+    }
+
+    // Initialize
+    toggleElectricityMode();
+    updateSummary(0,0,[]);
+  </script>
 </body>
 </html>
